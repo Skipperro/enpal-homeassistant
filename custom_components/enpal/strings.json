@@ -1,0 +1,32 @@
+{
+  "config": {
+    "error": {
+      "nothing_selected": "Please select at least one version of the protocol."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "check_ipv4": "Check IPv4 address",
+          "check_ipv6": "Check IPv6 address"
+        },
+        "description": "Select which addresses to check.",
+        "title": "IP settings"
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "nothing_selected": "Please select at least one version of the protocol."
+    },
+    "step": {
+      "init": {
+        "data": {
+          "check_ipv4": "Check IPv4 address",
+          "check_ipv6": "Check IPv6 address"
+        },
+        "description": "Select which addresses to check.",
+        "title": "IP settings"
+      }
+    }
+  }
+}

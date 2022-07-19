@@ -1,0 +1,6 @@
+{
+  "name": "Enpal",
+  "iot_class": "Cloud Polling",
+  "render_readme": true,
+  "zip_release": false
+}
