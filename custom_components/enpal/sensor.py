@@ -13,9 +13,9 @@ import logging
 from influxdb_client import InfluxDBClient
 
 _LOGGER = logging.getLogger(__name__)
-SCAN_INTERVAL = timedelta(seconds=300)
+SCAN_INTERVAL = timedelta(seconds=60)
 
-async def get_tables(ip: str, port: int, token: str):
+def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='my-new-org')
     query_api = client.query_api()
 
@@ -48,7 +48,7 @@ async def async_setup_entry(
         _LOGGER.error("No enpal_token in config entry")
         return
 
-    tables = await get_tables(config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'])
+    tables = await hass.async_add_executor_job(get_tables, config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'])
 
     for table in tables:
         field = table.records[0].values['_field']
@@ -96,7 +96,8 @@ class EnpalSensor(SensorEntity):
               |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
               |> yield(name: "last")'
 
-            tables = query_api.query(query)
+            # get tables asynchronously
+            tables = await self.hass.async_add_executor_job(query_api.query, query)
 
             value = None
             if tables:
