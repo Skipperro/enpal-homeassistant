@@ -55,9 +55,9 @@ async def async_setup_entry(
         measurement = table.records[0].values['_measurement']
 
         if measurement == "Gesamtleistung" and field == "Produktion":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:power', 'Solar Production', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'Solar Production', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
         if measurement == "Gesamtleistung" and field == "Verbrauch":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:power', 'Power Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
+            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Power Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
 
     entity_registry = async_get(hass)
     entries = async_entries_for_config_entry(
@@ -96,14 +96,15 @@ class EnpalSensor(SensorEntity):
               |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
               |> yield(name: "last")'
 
-            # get tables asynchronously
             tables = await self.hass.async_add_executor_job(query_api.query, query)
 
             value = None
             if tables:
                 value = tables[0].records[0].values['_value']
-            self._attr_native_value = value
-
+            self._attr_native_value = float(value)
+            self._attr_device_class = 'power'
+            self._attr_native_unit_of_measurement	= 'W'
+            self._attr_state_class = 'measurement'
             self._attr_extra_state_attributes['last_check'] = datetime.now()
             self._attr_extra_state_attributes['field'] = self.field
             self._attr_extra_state_attributes['measurement'] = self.measurement
