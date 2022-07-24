@@ -10,46 +10,23 @@ from homeassistant.helpers.entity_registry import async_get, async_entries_for_c
 from custom_components.enpal.const import DOMAIN
 import aiohttp
 import logging
+from influxdb_client import InfluxDBClient
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=300)
 
+async def get_tables(ip: str, port: int, token: str):
+    client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='my-new-org')
+    query_api = client.query_api()
 
-def validate_ipv4(s: str):
-    # IPv4 address is a string of 4 numbers separated by dots
-    a = s.split('.')
-    if len(a) != 4:
-        return False
-    for x in a:
-        if not x.isdigit():
-            return False
-        i = int(x)
-        if i < 0 or i > 255:
-            return False
-    return True
+    query = 'from(bucket: "my-new-bucket") \
+      |> range(start: -2m) \
+      |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
+      |> yield(name: "last")'
 
-def validate_ipv6(s: str):
-    # IPv6 address is a string of at least 5 strings separated by colons
-    a = s.split(':')
-    if len(a) < 5:
-        return False
-    allowed = []
-    for x in range(10):
-        allowed.append(str(x)) # 0-9
-    for x in range(97, 103):
-        allowed.append(chr(x)) # a-f
+    tables = query_api.query(query)
+    return tables
 
-    #if any element of a is longer than 4 characters, it is not a valid ipv6 address
-    for x in a:
-        if len(x) > 4:
-            return False
-
-    # if any element of 'a' contains not allowed character return false
-    for x in a:
-        for c in x:
-            if c not in allowed:
-                return False
-    return True
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -61,12 +38,26 @@ async def async_setup_entry(
     if config_entry.options:
         config.update(config_entry.options)
     to_add = []
-    if 'check_ipv4' in config:
-        if config['check_ipv4']:
-            to_add.append(IPSensor(False))
-    if 'check_ipv6' in config:
-        if config['check_ipv6']:
-            to_add.append(IPSensor(True))
+    if not 'enpal_host_ip' in config:
+        _LOGGER.error("No enpal_host_ip in config entry")
+        return
+    if not 'enpal_host_port' in config:
+        _LOGGER.error("No enpal_host_port in config entry")
+        return
+    if not 'enpal_token' in config:
+        _LOGGER.error("No enpal_token in config entry")
+        return
+
+    tables = await get_tables(config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'])
+
+    for table in tables:
+        field = table.records[0].values['_field']
+        measurement = table.records[0].values['_measurement']
+
+        if measurement == "Gesamtleistung" and field == "Produktion":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:power', 'Solar Production', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
+        if measurement == "Gesamtleistung" and field == "Verbrauch":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:power', 'Power Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
 
     entity_registry = async_get(hass)
     entries = async_entries_for_config_entry(
@@ -77,58 +68,47 @@ async def async_setup_entry(
 
     async_add_entities(to_add, update_before_add=True)
 
-class IPSensor(SensorEntity):
+class EnpalSensor(SensorEntity):
     """Representation of a Sensor."""
 
-    def __init__(self, ipv6: bool):
-        self.ipv6 = ipv6
-        self._attr_icon = 'mdi:web'
-        self._attr_name = "Public IPv4"
+    def __init__(self, field: str, measurement: str, icon:str, name: str, ip: str, port: int, token: str):
+        self.field = field
+        self.measurement = measurement
+        self.ip = ip
+        self.port = port
+        self.token = token
+        self._attr_icon = icon
+        self._attr_name = name
         self._attr_unique_id = str(uuid.uuid4())
         self._attr_extra_state_attributes = {}
-        if (self.ipv6):
-            self._attr_name = "Public IPv6"
-            self._attr_unique_id = str(uuid.uuid4())
 
     async def async_update(self) -> None:
-        """Fetch new state data for the sensor."""
-        if (self.ipv6):
-            url = 'https://api64.ipify.org/?format=json'
-        else:
-            url = 'https://api.ipify.org/?format=json'
 
         # Get the IP address from the API
         try:
-            starttime = datetime.now()
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    self._attr_extra_state_attributes['response_time_ms'] = (datetime.now() - starttime).microseconds//1000
-                    self._attr_extra_state_attributes['status_code'] = response.status
-                    self._attr_extra_state_attributes['last_check'] = datetime.now()
-                    if response.status == 200:
-                        data = await response.json()
-                        self._attr_extra_state_attributes['data'] = data
-                        if not 'ip' in data:
-                            self._attr_native_value = None
-                            _LOGGER.warning(f"No IP address in response: {data}")
-                            return
-                        ip = data['ip']
-                        self._state = None
-                        self._attr_native_value = None
-                        if (self.ipv6):
-                            if validate_ipv6(ip):
-                                self._attr_native_value = ip
-                        else:
-                            if validate_ipv4(ip):
-                                self._attr_native_value = ip
-                    else:
-                        self._state = "Error"
-                        self._attr_extra_state_attributes['data'] = None
-                        _LOGGER.error(f"Error {response.status} while getting IP")
+            client = InfluxDBClient(url=f'http://{self.ip}:{self.port}', token=self.token, org="my-new-org")
+            query_api = client.query_api()
+
+            query = f'from(bucket: "my-new-bucket") \
+              |> range(start: -2m) \
+              |> filter(fn: (r) => r["_measurement"] == "{self.measurement}") \
+              |> filter(fn: (r) => r["_field"] == "{self.field}") \
+              |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
+              |> yield(name: "last")'
+
+            tables = query_api.query(query)
+
+            value = None
+            if tables:
+                value = tables[0].records[0].values['_value']
+            self._attr_native_value = value
+
+            self._attr_extra_state_attributes['last_check'] = datetime.now()
+            self._attr_extra_state_attributes['field'] = self.field
+            self._attr_extra_state_attributes['measurement'] = self.measurement
+
         except Exception as e:
             _LOGGER.error(f'{e}')
             self._state = 'Error'
             self._attr_native_value = None
-            self._attr_extra_state_attributes['response_time_ms'] = None
-            self._attr_extra_state_attributes['status_code'] = None
             self._attr_extra_state_attributes['last_check'] = datetime.now()

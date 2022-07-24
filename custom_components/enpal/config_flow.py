@@ -2,11 +2,14 @@
 from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
+
+import aiohttp
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
+from influxdb_client import InfluxDBClient
 
 from .const import DOMAIN
 
@@ -15,10 +18,52 @@ big_int = vol.All(vol.Coerce(int), vol.Range(min=300))
 _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = vol.Schema(
             {
-                vol.Required('check_ipv4', default=True): cv.boolean,
-                vol.Required('check_ipv6', default=False): cv.boolean,
+                vol.Required('enpal_host_ip', default='192.168.178.'): cv.string,
+                vol.Required('enpal_host_port', default=8086): cv.positive_int,
+                vol.Required('enpal_token', default=''): cv.string,
             }
         )
+
+def validate_ipv4(s: str):
+    # IPv4 address is a string of 4 numbers separated by dots
+    a = s.split('.')
+    if len(a) != 4:
+        return False
+    for x in a:
+        if not x.isdigit():
+            return False
+        i = int(x)
+        if i < 0 or i > 255:
+            return False
+    return True
+
+async def get_health(ip: str, port: int):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'http://{ip}:{port}/health') as response:
+            return await response.json()
+
+async def check_for_influx(ip: str, port: int):
+    resp = await get_health(ip, port)
+    if resp['status'] == 'pass':
+        return True
+    return False
+
+async def check_token(ip: str, port: int, token: str):
+    client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='my-new-org')
+    query_api = client.query_api()
+
+    query = 'from(bucket: "my-new-bucket") \
+      |> range(start: -2m) \
+      |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
+      |> yield(name: "last")'
+
+    tables = query_api.query(query)
+
+    if tables:
+        if len(tables) > 10:
+            return True
+    return False
+
 
 class CustomFlow(config_entries.ConfigFlow, domain=DOMAIN):
     data: Optional[Dict[str, Any]]
@@ -27,10 +72,24 @@ class CustomFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: Dict[str, str] = {}
         if user_input is not None:
             self.data = user_input
-            if not self.data['check_ipv4'] and not self.data['check_ipv6']:
-                errors['base'] = 'nothing_selected'
+            if not validate_ipv4(self.data['enpal_host_ip']):
+                errors['base'] = 'invalid_ip'
+            if self.data['enpal_host_port'] < 300:
+                errors['base'] = 'port_too_low'
+            if self.data['enpal_host_port'] > 65535:
+                errors['base'] = 'port_too_high'
+            if not self.data['enpal_token']:
+                errors['base'] = 'token_empty'
+
             if not errors:
-                return self.async_create_entry(title="Ipify.org Public IP Check", data=self.data)
+                if not await check_for_influx(self.data['enpal_host_ip'], self.data['enpal_host_port']):
+                    errors['base'] = 'db_not_found'
+            if not errors:
+                if not check_token(self.data['enpal_host_ip'], self.data['enpal_host_port'], self.data['enpal_token']):
+                    errors['base'] = 'token_invalid'
+
+            if not errors:
+                return self.async_create_entry(title="Enpal", data=self.data)
 
         return self.async_show_form(step_id="user", data_schema=CONFIG_SCHEMA, errors=errors)
 
@@ -50,29 +109,50 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         errors: Dict[str, str] = {}
-
         if user_input is not None:
             self.data = user_input
-            if not self.data['check_ipv4'] and not self.data['check_ipv6']:
-                errors['base'] = 'nothing_selected'
-            if not errors:
-                return self.async_create_entry(title="Ipify.org Public IP Check", data={'check_ipv4': user_input['check_ipv4'], 'check_ipv6': user_input['check_ipv6']})
+            if not validate_ipv4(self.data['enpal_host_ip']):
+                errors['base'] = 'invalid_ip'
+            if self.data['enpal_host_port'] < 300:
+                errors['base'] = 'port_too_low'
+            if self.data['enpal_host_port'] > 65535:
+                errors['base'] = 'port_too_high'
+            if not self.data['enpal_token']:
+                errors['base'] = 'token_empty'
 
-        default_ipv4 = True
-        if 'check_ipv4' in self.config_entry.data:
-            default_ipv4 = self.config_entry.data['check_ipv4']
-        if 'check_ipv4' in self.config_entry.options:
-            default_ipv4 = self.config_entry.options['check_ipv4']
-        default_ipv6 = False
-        if 'check_ipv6' in self.config_entry.data:
-            default_ipv6 = self.config_entry.data['check_ipv6']
-        if 'check_ipv6' in self.config_entry.options:
-            default_ipv6 = self.config_entry.options['check_ipv6']
+            if not errors:
+                if not await check_for_influx(self.data['enpal_host_ip'], self.data['enpal_host_port']):
+                    errors['base'] = 'db_not_found'
+            if not errors:
+                if not check_token(self.data['enpal_host_ip'], self.data['enpal_host_port'], self.data['enpal_token']):
+                    errors['base'] = 'token_invalid'
+
+            if not errors:
+                return self.async_create_entry(title="Enpal", data={'enpal_host_ip': self.data['enpal_host_ip'], 'enpal_host_port': self.data['enpal_host_port'], 'enpal_token': self.data['enpal_token']})
+
+        default_ip = ''
+        if 'enpal_host_ip' in self.config_entry.data:
+            default_ip = self.config_entry.data['enpal_host_ip']
+        if 'enpal_host_ip' in self.config_entry.options:
+            default_ip = self.config_entry.options['enpal_host_ip']
+
+        default_port = 8086
+        if 'enpal_host_port' in self.config_entry.data:
+            default_port = self.config_entry.data['enpal_host_port']
+        if 'enpal_host_port' in self.config_entry.options:
+            default_port = self.config_entry.options['enpal_host_port']
+
+        default_token = ''
+        if 'enpal_token' in self.config_entry.data:
+            default_token = self.config_entry.data['enpal_token']
+        if 'enpal_token' in self.config_entry.options:
+            default_token = self.config_entry.options['enpal_token']
 
         OPTIONS_SCHEMA = vol.Schema(
             {
-                vol.Required('check_ipv4', default=default_ipv4): cv.boolean,
-                vol.Required('check_ipv6', default=default_ipv6): cv.boolean,
+                vol.Required('enpal_host_ip', default=default_ip): cv.string,
+                vol.Required('enpal_host_port', default=default_port): cv.positive_int,
+                vol.Required('enpal_token', default=default_token): cv.string,
             }
         )
         return self.async_show_form(step_id="init", data_schema=OPTIONS_SCHEMA, errors=errors)
