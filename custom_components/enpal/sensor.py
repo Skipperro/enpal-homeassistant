@@ -6,6 +6,8 @@ from datetime import timedelta, datetime
 from homeassistant.components.sensor import (SensorEntity)
 from homeassistant.core import HomeAssistant
 from homeassistant import config_entries
+from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_registry import async_get, async_entries_for_config_entry
 from custom_components.enpal.const import DOMAIN
 import aiohttp
@@ -55,9 +57,30 @@ async def async_setup_entry(
         measurement = table.records[0].values['_measurement']
 
         if measurement == "Gesamtleistung" and field == "Produktion":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'Solar Production', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'Solar Production', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
         if measurement == "Gesamtleistung" and field == "Verbrauch":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Power Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token']))
+            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Power Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
+        if measurement == "inverterTemperature" and field == "Temperature":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:temperature', 'Inverter Temperature', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'temperature', '°C'))
+        if measurement == "gridFrequency" and field == "Frequenz":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Grid Frequency', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'frequency', 'Hz'))
+
+        if measurement == "phasePowerAc" and field == "Phase1":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'AC Power Phase 1', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
+        if measurement == "phasePowerAc" and field == "Phase2":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'AC Power Phase 2', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
+        if measurement == "phasePowerAc" and field == "Phase3":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'AC Power Phase 3', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
+
+        if measurement == "productionCurrentDc" and field == "String1":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'DC Current String 1', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'],'current', 'A'))
+        if measurement == "productionCurrentDc" and field == "String2":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'DC Current String 2', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'],'current', 'A'))
+
+        if measurement == "productionVoltageDc" and field == "String1":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'DC Voltage String 1', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'voltage', 'V'))
+        if measurement == "productionVoltageDc" and field == "String2":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'DC Voltage String 2', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'voltage', 'V'))
 
     entity_registry = async_get(hass)
     entries = async_entries_for_config_entry(
@@ -71,16 +94,24 @@ async def async_setup_entry(
 class EnpalSensor(SensorEntity):
     """Representation of a Sensor."""
 
-    def __init__(self, field: str, measurement: str, icon:str, name: str, ip: str, port: int, token: str):
+    def __init__(self, field: str, measurement: str, icon:str, name: str, ip: str, port: int, token: str, device_class: str, unit: str):
         self.field = field
         self.measurement = measurement
         self.ip = ip
         self.port = port
         self.token = token
+        self.enpal_device_class = device_class
+        self.unit = unit
         self._attr_icon = icon
         self._attr_name = name
         self._attr_unique_id = str(uuid.uuid4())
         self._attr_extra_state_attributes = {}
+
+        self._attr_device_info = DeviceInfo(
+            entry_type=DeviceEntryType.SERVICE,
+            identifiers={(DOMAIN, 'enpal')},
+            name="Enpal Solar Installation",
+        )
 
     async def async_update(self) -> None:
 
@@ -102,8 +133,8 @@ class EnpalSensor(SensorEntity):
             if tables:
                 value = tables[0].records[0].values['_value']
             self._attr_native_value = float(value)
-            self._attr_device_class = 'power'
-            self._attr_native_unit_of_measurement	= 'W'
+            self._attr_device_class = self.enpal_device_class
+            self._attr_native_unit_of_measurement	= self.unit
             self._attr_state_class = 'measurement'
             self._attr_extra_state_attributes['last_check'] = datetime.now()
             self._attr_extra_state_attributes['field'] = self.field
