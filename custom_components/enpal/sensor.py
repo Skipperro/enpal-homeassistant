@@ -15,14 +15,14 @@ import logging
 from influxdb_client import InfluxDBClient
 
 _LOGGER = logging.getLogger(__name__)
-SCAN_INTERVAL = timedelta(seconds=60)
+SCAN_INTERVAL = timedelta(seconds=120)
 
 def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='my-new-org')
     query_api = client.query_api()
 
     query = 'from(bucket: "my-new-bucket") \
-      |> range(start: -2m) \
+      |> range(start: -5m) \
       |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
       |> yield(name: "last")'
 
@@ -61,7 +61,7 @@ async def async_setup_entry(
         if measurement == "Gesamtleistung" and field == "Verbrauch":
             to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Power Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
         if measurement == "inverterTemperature" and field == "Temperature":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:temperature', 'Inverter Temperature', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'temperature', '°C'))
+            to_add.append(EnpalSensor(field, measurement, 'mdi:thermometer', 'Inverter Temperature', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'temperature', '°C'))
         if measurement == "gridFrequency" and field == "Frequenz":
             to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Grid Frequency', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'frequency', 'Hz'))
 
@@ -121,7 +121,7 @@ class EnpalSensor(SensorEntity):
             query_api = client.query_api()
 
             query = f'from(bucket: "my-new-bucket") \
-              |> range(start: -2m) \
+              |> range(start: -5m) \
               |> filter(fn: (r) => r["_measurement"] == "{self.measurement}") \
               |> filter(fn: (r) => r["_field"] == "{self.field}") \
               |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
@@ -133,6 +133,8 @@ class EnpalSensor(SensorEntity):
             if tables:
                 value = tables[0].records[0].values['_value']
             self._attr_native_value = float(value)
+            if self.measurement == 'productionCurrentDc' and self.unit == 'A':
+                self._attr_native_value = float(value/1000)
             self._attr_device_class = self.enpal_device_class
             self._attr_native_unit_of_measurement	= self.unit
             self._attr_state_class = 'measurement'
