@@ -134,12 +134,12 @@ class BatteryEstimate(SensorEntity):
             self._attr_extra_state_attributes['power_consumption'] = power_consumption
             self._attr_extra_state_attributes['power_production'] = power_production
 
-            battery_change = float(power_production) - float(power_consumption)
+            battery_change_kw = (float(power_production) - float(power_consumption)) / 1000
 
-            self._attr_extra_state_attributes['battery_change'] = battery_change
+            self._attr_extra_state_attributes['battery_change_kw'] = battery_change_kw
 
             # calculate battery change in kWh for the time between last check and now
-            battery_change_kwh = battery_change * (datetime.now() - last_check).seconds / 3600
+            battery_change_kwh = battery_change_kw * (datetime.now() - last_check).seconds / 3600
 
             self._attr_extra_state_attributes['battery_change_kwh'] = battery_change_kwh
 
