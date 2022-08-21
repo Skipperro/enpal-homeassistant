@@ -130,6 +130,8 @@ class BatteryEstimate(SensorEntity):
             power_production = self.hass.states.get('sensor.solar_production').state
             # calculate battery estimate
 
+            _LOGGER.warning('Power Consumption: ' + power_consumption)
+
             battery_change = float(power_production) - float(power_consumption)
 
             # calculate battery change in kWh for the time between last check and now
