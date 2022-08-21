@@ -130,8 +130,6 @@ class BatteryEstimate(SensorEntity):
             power_production = self.hass.states.get('sensor.solar_production').state
             # calculate battery estimate
 
-            _LOGGER.info(power_production)
-
             battery_change = float(power_production) - float(power_consumption)
 
             # calculate battery change in kWh for the time between last check and now
@@ -139,11 +137,12 @@ class BatteryEstimate(SensorEntity):
 
             # get current battery capacity from hass
             battery_capacity = self.hass.states.get(self.entity_id).state
-            if battery_capacity == None:
+            if battery_capacity == None or battery_capacity.lower() == 'Unknown':
                 battery_capacity = self.max_capacity
+            battery_capacity_float = float(battery_capacity)
 
             # Set new battery capacity
-            end_value = battery_capacity + battery_change_kwh
+            end_value = battery_capacity_float + battery_change_kwh
             if end_value > self.max_capacity:
                 end_value = self.max_capacity
             if end_value < 0:
