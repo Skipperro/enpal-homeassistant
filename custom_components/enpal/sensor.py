@@ -103,6 +103,7 @@ class BatteryEstimate(SensorEntity):
     def __init__(self, max_capacity: float):
         self.max_capacity = max_capacity
         self._attr_native_value = max_capacity
+        self.battery_capacity = max_capacity
 
         self._attr_icon = 'mdi:home-battery'
         self._attr_name = 'Battery Capacity Estimate'
@@ -130,26 +131,26 @@ class BatteryEstimate(SensorEntity):
             power_production = self.hass.states.get('sensor.solar_production').state
             # calculate battery estimate
 
-            _LOGGER.warning('Power Consumption: ' + power_consumption)
+            self._attr_extra_state_attributes['power_consumption'] = power_consumption
+            self._attr_extra_state_attributes['power_production'] = power_production
 
             battery_change = float(power_production) - float(power_consumption)
+
+            self._attr_extra_state_attributes['battery_change'] = battery_change
 
             # calculate battery change in kWh for the time between last check and now
             battery_change_kwh = battery_change * (datetime.now() - last_check).seconds / 3600
 
-            # get current battery capacity from hass
-            battery_capacity = self.hass.states.get(self.entity_id).state
-            if battery_capacity == None or battery_capacity.lower() == 'Unknown':
-                battery_capacity = self.max_capacity
-            battery_capacity_float = float(battery_capacity)
+            self._attr_extra_state_attributes['battery_change_kwh'] = battery_change_kwh
 
             # Set new battery capacity
-            end_value = battery_capacity_float + battery_change_kwh
+            end_value = self.battery_capacity + battery_change_kwh
             if end_value > self.max_capacity:
                 end_value = self.max_capacity
             if end_value < 0:
                 end_value = 0
-            self._attr_native_value = end_value
+            self.battery_capacity = end_value
+            self._attr_native_value = self.battery_capacity
             self._attr_extra_state_attributes['last_check'] = datetime.now()
 
         except Exception as e:
