@@ -107,7 +107,7 @@ class BatteryEstimate(SensorEntity):
 
         self._attr_icon = 'mdi:home-battery'
         self._attr_name = 'Battery Capacity Estimate'
-        self._attr_unique_id = str(uuid.uuid4())
+        self._attr_unique_id = 'enpal_battery_capacity_estimate'
         self._attr_extra_state_attributes = {}
         self._attr_extra_state_attributes['last_check'] = datetime.now()
 
@@ -135,6 +135,12 @@ class BatteryEstimate(SensorEntity):
             self._attr_extra_state_attributes['power_production'] = power_production
 
             battery_change_kw = (float(power_production) - float(power_consumption)) / 1000
+
+            # Make sure battery is nor over-charged nor over-discharged beyond specs.
+            if battery_change_kw > self.battery_capacity/2:
+                battery_change_kw = self.battery_capacity/2
+            if battery_change_kw < -self.battery_capacity/2:
+                battery_change_kw = -self.battery_capacity/2
 
             self._attr_extra_state_attributes['battery_change_kw'] = battery_change_kw
 
@@ -171,7 +177,7 @@ class EnpalSensor(SensorEntity):
         self.unit = unit
         self._attr_icon = icon
         self._attr_name = name
-        self._attr_unique_id = str(uuid.uuid4())
+        self._attr_unique_id = f'enpal_{measurement}_{field}'
         self._attr_extra_state_attributes = {}
 
         self._attr_device_info = DeviceInfo(
