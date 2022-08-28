@@ -113,8 +113,10 @@ class BatteryEstimate(SensorEntity):
 
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, 'enpal')},
-            name="Enpal Solar Installation",
+            identifiers={(DOMAIN, 'enpal_battery_capacity_estimate')},
+            default_name="Enpal Solar Installation",
+            default_manufacturer="Enpal",
+            sw_version="0.1.0",
         )
 
     async def async_update(self) -> None:
@@ -182,8 +184,10 @@ class EnpalSensor(SensorEntity):
 
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
-            identifiers={(DOMAIN, 'enpal')},
-            name="Enpal Solar Installation",
+            identifiers={(DOMAIN, f'enpal_{measurement}_{field}')},
+            default_name="Enpal Solar Installation",
+            default_manufacturer="Enpal",
+            sw_version="0.1.0",
         )
 
     async def async_update(self) -> None:
