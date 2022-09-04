@@ -127,20 +127,8 @@ class BatteryEstimate(SensorEntity):
             sw_version=VERSION,
         )
 
-        # Get the config for the integration
-        config = self.hass.data[DOMAIN][self.unique_id]
-
-        if not 'enpal_battery_charge' in config:
-            config['enpal_battery_charge'] = 10.0
-        if not 'enpal_battery_last_update' in config:
-            config['enpal_battery_last_update'] = datetime.now()
-        if not 'enpal_battery_energy_in' in config:
-            config['enpal_battery_energy_in'] = 0.0
-        if not 'enpal_battery_energy_out' in config:
-            config['enpal_battery_energy_out'] = 0.0
-
-        self.battery_capacity = float(config['enpal_battery_charge'])
-        self._attr_extra_state_attributes['last_check'] = config['enpal_battery_last_update']
+        self.battery_capacity = float(10.0)
+        self._attr_extra_state_attributes['last_check'] = datetime.now()
 
     async def async_update(self) -> None:
         try:
@@ -150,6 +138,15 @@ class BatteryEstimate(SensorEntity):
 
             # Get the config for the integration
             config = self.hass.data[DOMAIN][self.unique_id]
+
+            if not 'enpal_battery_charge' in config:
+                config['enpal_battery_charge'] = 10.0
+            if not 'enpal_battery_last_update' in config:
+                config['enpal_battery_last_update'] = datetime.now()
+            if not 'enpal_battery_energy_in' in config:
+                config['enpal_battery_energy_in'] = 0.0
+            if not 'enpal_battery_energy_out' in config:
+                config['enpal_battery_energy_out'] = 0.0
 
             # get last_check of this sensor from extra state attributes
             last_check = self.hass.states.get(self.entity_id).attributes['last_check']
@@ -178,8 +175,8 @@ class BatteryEstimate(SensorEntity):
             self._attr_extra_state_attributes['battery_change_kwh'] = battery_change_kwh
 
             # Set new battery capacity
-            old_value = self.battery_capacity
-            end_value = self.battery_capacity + battery_change_kwh
+            old_value = config['enpal_battery_charge']
+            end_value = old_value + battery_change_kwh
             if end_value > self.max_capacity:
                 end_value = self.max_capacity
             if end_value < 0.0:
@@ -188,6 +185,7 @@ class BatteryEstimate(SensorEntity):
             self._attr_native_value = self.battery_capacity
             self._attr_extra_state_attributes['last_check'] = datetime.now()
             config['enpal_battery_last_update'] = datetime.now()
+            config['enpal_battery_charge'] = self.battery_capacity
 
             flow_value = end_value - old_value
             if flow_value > 0.0:
