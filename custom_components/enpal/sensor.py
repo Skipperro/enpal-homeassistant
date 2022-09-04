@@ -1,6 +1,7 @@
 """Platform for sensor integration."""
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import timedelta, datetime
 from homeassistant.components.sensor import (SensorEntity)
@@ -16,6 +17,8 @@ from influxdb_client import InfluxDBClient
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=120)
+
+VERSION= '0.1.0'
 
 def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='my-new-org')
@@ -49,6 +52,10 @@ async def async_setup_entry(
     if not 'enpal_token' in config:
         _LOGGER.error("No enpal_token in config entry")
         return
+    if not 'enpal_battery_charge' in config:
+        config['enpal_battery_charge'] = 10.0
+    if not 'enpal_battery_last_update' in config:
+        config['enpal_battery_last_update'] = datetime.now()
 
     tables = await hass.async_add_executor_job(get_tables, config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'])
 
@@ -89,6 +96,8 @@ async def async_setup_entry(
 
     if production_found and consumption_found:
         to_add.append(BatteryEstimate(10.0))
+        to_add.append(BatteryFlowSensor('in'))
+        to_add.append(BatteryFlowSensor('out'))
 
     entity_registry = async_get(hass)
     entries = async_entries_for_config_entry(
@@ -103,27 +112,44 @@ class BatteryEstimate(SensorEntity):
     def __init__(self, max_capacity: float):
         self.max_capacity = max_capacity
         self._attr_native_value = max_capacity
-        self.battery_capacity = max_capacity
 
         self._attr_icon = 'mdi:home-battery'
         self._attr_name = 'Battery Capacity Estimate'
         self._attr_unique_id = 'enpal_battery_capacity_estimate'
         self._attr_extra_state_attributes = {}
-        self._attr_extra_state_attributes['last_check'] = datetime.now()
+
 
         self._attr_device_info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, 'enpal')},
             default_name="Enpal Solar Installation",
             default_manufacturer="Enpal",
-            sw_version="0.1.0",
+            sw_version=VERSION,
         )
+
+        # Get the config for the integration
+        config = self.hass.data[DOMAIN][self.unique_id]
+
+        if not 'enpal_battery_charge' in config:
+            config['enpal_battery_charge'] = 10.0
+        if not 'enpal_battery_last_update' in config:
+            config['enpal_battery_last_update'] = datetime.now()
+        if not 'enpal_battery_energy_in' in config:
+            config['enpal_battery_energy_in'] = 0.0
+        if not 'enpal_battery_energy_out' in config:
+            config['enpal_battery_energy_out'] = 0.0
+
+        self.battery_capacity = float(config['enpal_battery_charge'])
+        self._attr_extra_state_attributes['last_check'] = config['enpal_battery_last_update']
 
     async def async_update(self) -> None:
         try:
             self._attr_device_class = 'energy'
             self._attr_native_unit_of_measurement = 'kWh'
             self._attr_state_class = 'measurement'
+
+            # Get the config for the integration
+            config = self.hass.data[DOMAIN][self.unique_id]
 
             # get last_check of this sensor from extra state attributes
             last_check = self.hass.states.get(self.entity_id).attributes['last_check']
@@ -152,20 +178,80 @@ class BatteryEstimate(SensorEntity):
             self._attr_extra_state_attributes['battery_change_kwh'] = battery_change_kwh
 
             # Set new battery capacity
+            old_value = self.battery_capacity
             end_value = self.battery_capacity + battery_change_kwh
             if end_value > self.max_capacity:
                 end_value = self.max_capacity
-            if end_value < 0:
-                end_value = 0
+            if end_value < 0.0:
+                end_value = 0.0
             self.battery_capacity = end_value
             self._attr_native_value = self.battery_capacity
             self._attr_extra_state_attributes['last_check'] = datetime.now()
+            config['enpal_battery_last_update'] = datetime.now()
+
+            flow_value = end_value - old_value
+            if flow_value > 0.0:
+                config['enpal_battery_energy_in'] = flow_value
+                config['enpal_battery_energy_out'] = 0.0
+            else:
+                config['enpal_battery_energy_out'] = flow_value
+                config['enpal_battery_energy_in'] = 0.0
 
         except Exception as e:
             _LOGGER.error(f'{e}')
             self._state = 'Error'
             self._attr_native_value = None
             self._attr_extra_state_attributes['last_check'] = datetime.now()
+
+
+class BatteryFlowSensor(SensorEntity):
+    def __init__(self, type: str):
+        self._attr_extra_state_attributes = {}
+        self._attr_device_class = 'energy'
+        self._attr_native_unit_of_measurement = 'kWh'
+        self._attr_state_class = 'measurement'
+        self._attr_extra_state_attributes['type'] = type
+
+        if type == 'in':
+            self._attr_icon = 'mdi:battery-plus-variant'
+            self._attr_name = 'Battery Energy In'
+            self._attr_unique_id = 'enpal_battery_energy_in'
+        else:
+            self._attr_icon = 'mdi:battery-minus-variant'
+            self._attr_name = 'Battery Energy Out'
+            self._attr_unique_id = 'enpal_battery_energy_out'
+
+        self._attr_device_info = DeviceInfo(
+            entry_type=DeviceEntryType.SERVICE,
+            identifiers={(DOMAIN, 'enpal')},
+            default_name="Enpal Solar Installation",
+            default_manufacturer="Enpal",
+            sw_version=VERSION,
+        )
+
+    async def async_update(self) -> None:
+        try:
+            self._attr_device_class = 'energy'
+            self._attr_native_unit_of_measurement = 'kWh'
+            self._attr_state_class = 'measurement'
+
+            # Get the config for the integration
+            config = self.hass.data[DOMAIN][self.unique_id]
+
+            # wait for 2 seconds to make sure the battery estimate sensor has updated
+            await asyncio.sleep(2)
+
+            flow_type: str = self.hass.states.get(self.entity_id).attributes['type']
+
+            if flow_type == 'in':
+                self._attr_native_value = config['enpal_battery_energy_in']
+            elif flow_type == 'out':
+                self._attr_native_value = config['enpal_battery_energy_out']
+
+        except Exception as e:
+            _LOGGER.error(f'{e}')
+            self._state = 'Error'
+            self._attr_native_value = None
 
 class EnpalSensor(SensorEntity):
 
@@ -187,7 +273,7 @@ class EnpalSensor(SensorEntity):
             identifiers={(DOMAIN, 'enpal')},
             default_name="Enpal Solar Installation",
             default_manufacturer="Enpal",
-            sw_version="0.1.0",
+            sw_version=VERSION,
         )
 
     async def async_update(self) -> None:
