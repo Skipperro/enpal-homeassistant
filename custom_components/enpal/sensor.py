@@ -52,10 +52,13 @@ async def async_setup_entry(
     if not 'enpal_token' in config:
         _LOGGER.error("No enpal_token in config entry")
         return
-    if not 'enpal_battery_charge' in config:
-        config['enpal_battery_charge'] = 10.0
-    if not 'enpal_battery_last_update' in config:
-        config['enpal_battery_last_update'] = datetime.now()
+
+    global_config = hass.data[DOMAIN]
+
+    if not 'enpal_battery_charge' in global_config:
+        global_config['enpal_battery_charge'] = 10.0
+    if not 'enpal_battery_last_update' in global_config:
+        global_config['enpal_battery_last_update'] = datetime.now()
 
     tables = await hass.async_add_executor_job(get_tables, config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'])
 
@@ -137,7 +140,7 @@ class BatteryEstimate(SensorEntity):
             self._attr_state_class = 'measurement'
 
             # Get the config for the integration
-            config = self.hass.data[DOMAIN][self.unique_id]
+            config = self.hass.data[DOMAIN]
 
             if not 'enpal_battery_charge' in config:
                 config['enpal_battery_charge'] = 10.0
@@ -234,7 +237,7 @@ class BatteryFlowSensor(SensorEntity):
             self._attr_state_class = 'measurement'
 
             # Get the config for the integration
-            config = self.hass.data[DOMAIN][self.unique_id]
+            config = self.hass.data[DOMAIN]
 
             # wait for 2 seconds to make sure the battery estimate sensor has updated
             await asyncio.sleep(2)
@@ -242,9 +245,11 @@ class BatteryFlowSensor(SensorEntity):
             flow_type: str = self.hass.states.get(self.entity_id).attributes['type']
 
             if flow_type == 'in':
-                self._attr_native_value = config['enpal_battery_energy_in']
+                if 'enpal_battery_energy_in' in config:
+                    self._attr_native_value = config['enpal_battery_energy_in']
             elif flow_type == 'out':
-                self._attr_native_value = config['enpal_battery_energy_out']
+                if 'enpal_battery_energy_out' in config:
+                    self._attr_native_value = config['enpal_battery_energy_out']
 
         except Exception as e:
             _LOGGER.error(f'{e}')
