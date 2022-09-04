@@ -195,7 +195,7 @@ class BatteryEstimate(SensorEntity):
                 config['enpal_battery_energy_in'] = flow_value
                 config['enpal_battery_energy_out'] = 0.0
             else:
-                config['enpal_battery_energy_out'] = flow_value
+                config['enpal_battery_energy_out'] = -flow_value
                 config['enpal_battery_energy_in'] = 0.0
 
         except Exception as e:
