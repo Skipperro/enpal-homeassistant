@@ -57,8 +57,16 @@ async def async_setup_entry(
 
     if not 'enpal_battery_charge' in global_config:
         global_config['enpal_battery_charge'] = 10.0
+        _LOGGER.warning("No enpal_battery_charge in config entry, using default value 10.0")
     if not 'enpal_battery_last_update' in global_config:
         global_config['enpal_battery_last_update'] = datetime.now()
+        _LOGGER.warning("No enpal_battery_last_update in config entry, using default value now")
+    if not 'enpal_battery_energy_in' in global_config:
+        global_config['enpal_battery_energy_in'] = 0.0
+        _LOGGER.warning("No enpal_battery_energy_in in config entry, using default value 0.0")
+    if not 'enpal_battery_energy_out' in global_config:
+        global_config['enpal_battery_energy_out'] = 0.0
+        _LOGGER.warning("No enpal_battery_energy_out in config entry, using default value 0.0")
 
     tables = await hass.async_add_executor_job(get_tables, config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'])
 
@@ -114,7 +122,6 @@ async def async_setup_entry(
 class BatteryEstimate(SensorEntity):
     def __init__(self, max_capacity: float):
         self.max_capacity = max_capacity
-        self._attr_native_value = max_capacity
 
         self._attr_icon = 'mdi:home-battery'
         self._attr_name = 'Battery Capacity Estimate'
@@ -143,13 +150,13 @@ class BatteryEstimate(SensorEntity):
             config = self.hass.data[DOMAIN]
 
             if not 'enpal_battery_charge' in config:
-                config['enpal_battery_charge'] = 10.0
+                return
             if not 'enpal_battery_last_update' in config:
-                config['enpal_battery_last_update'] = datetime.now()
+                return
             if not 'enpal_battery_energy_in' in config:
-                config['enpal_battery_energy_in'] = 0.0
+                return
             if not 'enpal_battery_energy_out' in config:
-                config['enpal_battery_energy_out'] = 0.0
+                return
 
             # get last_check of this sensor from extra state attributes
             last_check = self.hass.states.get(self.entity_id).attributes['last_check']
@@ -193,7 +200,7 @@ class BatteryEstimate(SensorEntity):
             flow_value = end_value - old_value
             if flow_value > 0.0:
                 config['enpal_battery_energy_in'] = config['enpal_battery_energy_in'] + flow_value
-            else:
+            if flow_value < 0.0:
                 config['enpal_battery_energy_out'] = config['enpal_battery_energy_out'] - flow_value
 
         except Exception as e:
@@ -232,7 +239,7 @@ class BatteryFlowSensor(SensorEntity):
         try:
             self._attr_device_class = 'energy'
             self._attr_native_unit_of_measurement = 'kWh'
-            self._attr_state_class = 'measurement'
+            self._attr_state_class = 'total_increasing'
 
             # Get the config for the integration
             config = self.hass.data[DOMAIN]
