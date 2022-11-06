@@ -137,7 +137,13 @@ class BatteryEstimate(SensorEntity):
             sw_version=VERSION,
         )
 
-        self.battery_capacity = float(10.0)
+
+        self.battery_capacity = float(self.max_capacity)
+        try:
+            oldvalue = self.hass.states.get(self.entity_id).attributes['enpal_battery_charge']
+            self.battery_capacity = float(oldvalue)
+        except:
+            pass
         self._attr_extra_state_attributes['last_check'] = datetime.now()
 
     async def async_update(self) -> None:
@@ -172,10 +178,10 @@ class BatteryEstimate(SensorEntity):
             battery_change_kw = (float(power_production) - float(power_consumption)) / 1000
 
             # Make sure battery is nor over-charged nor over-discharged beyond specs.
-            if battery_change_kw > self.battery_capacity/2:
-                battery_change_kw = self.battery_capacity/2
-            if battery_change_kw < -self.battery_capacity/2:
-                battery_change_kw = -self.battery_capacity/2
+            if battery_change_kw > self.max_capacity/2:
+                battery_change_kw = self.max_capacity/2
+            if battery_change_kw < -self.max_capacity/2:
+                battery_change_kw = -self.max_capacity/2
 
             self._attr_extra_state_attributes['battery_change_kw'] = battery_change_kw
 
