@@ -18,22 +18,28 @@ It is still a work in progress and is not guaranteed to work 100% or even work a
 ## Features
 
 - **Inverter measurements**:
-  - Solar production.
-  - House energy consumption.
-  - 3 Phase Power.
-  - Grid frequency.
+  - Solar Production Power
+  - Power House Total
+  - Power External Total'
+  - Energy Consumption
+  - Production Day
   - Inverter temperature.
-- **Solar panels**:
-  - Voltage for 2 strings.
-  - Current for 2 strings.
+  - Energy External Out Day
+  - Energy External In Day
+  - Voltage, Current, Power Phase A, B and C
 - **Battery estimation**:
-   - Due to lack of direct data in InfluxDB, the battery level is estimated by the calculated difference between energy production and consumption.
-   - Battery estimation is not 100% accurate, but it's close enough.
-   - Getting access to real battery level is not possible yet, but on the roadmap.
+  - Battery Power
+  - Battery Percent
+  - Battery Charge Day
+  - Battery Discharge Day
+  - Battery Charge Total
+  - Battery Disharge Total
 - **WallBox**:
-  - ToDo
+  - Wallbox Charge Percent
+  - Wallbox Charging Power
+  - Wallbox Charging Total
 
-![enpal measurements](images/enpal-measurements.png)
+![enpal measurements](images/measurements.png)
 
 ## Installation
 
@@ -50,9 +56,11 @@ repository into the `custom_components/enpal` directory.
 
 ## How to get access token?
 
-Currently only way to get the token is to contact Enpal support.<br>
-More convenient, automated way is planned for the future.
+Look at the Solar Rel Web Interface on your Local Network under Config!
+
+or you can contact Enpal support.<br>
 
 ## Credits
  
 - Skipperro: Creating the integration for Home Assistant.
+- gickowtf: Creating the integrartion for Home Assistant with the new Enpal Solar Rel Web Interface
