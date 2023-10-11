@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = vol.Schema(
             {
-                vol.Required('enpal_host_ip', default='192.168.137.36'): cv.string,
+                vol.Required('enpal_host_ip', default='192.168.178.'): cv.string,
                 vol.Required('enpal_host_port', default=8086): cv.positive_int,
                 vol.Required('enpal_token', default=''): cv.string,
             }
