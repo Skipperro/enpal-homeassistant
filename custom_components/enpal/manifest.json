@@ -1,11 +1,11 @@
 {
   "domain": "enpal",
   "name": "Enpal",
-  "documentation": "https://github.com/Skipperro/enpal-homeassistant",
+  "documentation": "https://github.com/gickowtf/enpal-homeassistant",
   "dependencies": [],
-  "codeowners": ["Skipperro"],
+  "codeowners": ["Skipperro", "gickowtf"],
   "requirements": [],
   "iot_class": "local_polling",
   "config_flow": true,
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
