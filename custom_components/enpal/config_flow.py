@@ -16,9 +16,10 @@ from .const import DOMAIN
 big_int = vol.All(vol.Coerce(int), vol.Range(min=300))
 
 _LOGGER = logging.getLogger(__name__)
+
 CONFIG_SCHEMA = vol.Schema(
             {
-                vol.Required('enpal_host_ip', default='192.168.178.'): cv.string,
+                vol.Required('enpal_host_ip', default='192.168.178'): cv.string,
                 vol.Required('enpal_host_port', default=8086): cv.positive_int,
                 vol.Required('enpal_token', default=''): cv.string,
             }
@@ -49,10 +50,10 @@ async def check_for_influx(ip: str, port: int):
     return False
 
 async def check_token(ip: str, port: int, token: str):
-    client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='my-new-org')
+    client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='enpal')
     query_api = client.query_api()
 
-    query = 'from(bucket: "my-new-bucket") \
+    query = 'from(bucket: "solar") \
       |> range(start: -2m) \
       |> aggregateWindow(every: 2m, fn: last, createEmpty: false) \
       |> yield(name: "last")'
