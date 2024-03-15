@@ -18,7 +18,7 @@ from influxdb_client import InfluxDBClient
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=20)
 
-VERSION= '0.2.0'
+VERSION= '0.2.1'
 
 def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='enpal')
@@ -150,6 +150,7 @@ class EnpalSensor(SensorEntity):
 
 
     async def async_update(self) -> None:
+        now = datetime.now().time()
 
         # Get the IP address from the API
         try:
@@ -168,20 +169,24 @@ class EnpalSensor(SensorEntity):
             if tables:
                 value = tables[0].records[0].values['_value']
 
+            if self.unit == "kWh" and (now >= datetime.strptime("23:59", "%H:%M").time() or now < datetime.strptime("00:05", "%H:%M").time()):
+                _LOGGER.info("Abfragezeit liegt zwischen 23:59 und 0:05 Uhr. Alle Werte in kWh werden auf 0 gesetzt.")
+                value = 0.00
+
             self._attr_native_value = round(float(value), 2)
             self._attr_device_class = self.enpal_device_class
-            self._attr_native_unit_of_measurement	= self.unit
+            self._attr_native_unit_of_measurement = self.unit
             self._attr_state_class = 'measurement'
             self._attr_extra_state_attributes['last_check'] = datetime.now()
             self._attr_extra_state_attributes['field'] = self.field
             self._attr_extra_state_attributes['measurement'] = self.measurement
-            
+
             #if self.field == 'Energy.Consumption.Total.Day' or 'Energy.Storage.Total.Out.Day' or 'Energy.Storage.Total.In.Day' or 'Energy.Production.Total.Day' or 'Energy.External.Total.Out.Day' or 'Energy.External.Total.In.Day':
             if self._attr_native_unit_of_measurement == "kWh":
-                self._attr_extra_state_attributes['last_reset'] = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                self._attr_extra_state_attributes['last_reset'] = datetime.utcnow().replace(hour=0, minute=5, second=0, microsecond=0)
                 self._attr_state_class = 'total'
             if self._attr_native_unit_of_measurement == "Wh":
-                self._attr_extra_state_attributes['last_reset'] = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                self._attr_extra_state_attributes['last_reset'] = datetime.utcnow().replace(hour=0, minute=5, second=0, microsecond=0)
                 self._attr_state_class = 'total'
 
             if self.field == 'Percent.Storage.Level':
