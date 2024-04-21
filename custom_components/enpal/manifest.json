@@ -1,7 +1,7 @@
 {
   "domain": "enpal",
   "name": "Enpal",
-  "documentation": "https://github.com/gickowtf/enpal-homeassistant",
+  "documentation": "https://github.com/skipperro/enpal-homeassistant",
   "dependencies": [],
   "codeowners": ["Skipperro", "gickowtf"],
   "requirements": [],
