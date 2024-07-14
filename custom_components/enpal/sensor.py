@@ -18,7 +18,9 @@ from influxdb_client import InfluxDBClient
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=20)
 
-VERSION= '0.2.0'
+VERSION= '0.2.1'
+
+sc_wallbox_total_charge = 0.0
 
 def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='enpal')
@@ -67,6 +69,9 @@ async def async_setup_entry(
             to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Power House Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
         if measurement == "system" and field == "Power.External.Total":
             to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Power External Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
+        if measurement == "inverter" and field == "Inverter.System.State":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'Enpal Inverter State', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', ''))
+
         # Consum Total per Day
         if measurement == "system" and field == "Energy.Consumption.Total.Day":
             to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Energy Consumption', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
@@ -168,6 +173,29 @@ class EnpalSensor(SensorEntity):
             if tables:
                 value = tables[0].records[0].values['_value']
 
+            # Sanity check for wallbox power - it should not be negative or greater than 30kW
+            if self.field == 'Power.Wallbox.Connector.1.Charging':
+                if value < 0 or value > 30000:
+                    # write warning to log
+                    _LOGGER.warning(f'Wallbox power value out of range: {value}')
+                    return
+
+            # Sanity check for wallbox total charge - it should not be negative or much bigger than last valid reading
+            if self.field == 'Energy.Wallbox.Connector.1.Charged.Total':
+                global sc_wallbox_total_charge
+                if sc_wallbox_total_charge > 0.0:         # Newly restarted HA will skip first check
+                    if value < 0:
+                        # write warning to log
+                        _LOGGER.warning(f'Wallbox total charge value is negative: {value}')
+                        return
+                    if value > 10000:           # skip check for new installations with low total charge
+                        if value > sc_wallbox_total_charge * 2.0:
+                                # write warning to log
+                                _LOGGER.warning(f'Wallbox total charge value of {value} is much bigger than last valid reading of {sc_wallbox_total_charge}')
+                                return
+
+                sc_wallbox_total_charge = value
+
             self._attr_native_value = round(float(value), 2)
             self._attr_device_class = self.enpal_device_class
             self._attr_native_unit_of_measurement	= self.unit
@@ -175,8 +203,7 @@ class EnpalSensor(SensorEntity):
             self._attr_extra_state_attributes['last_check'] = datetime.now()
             self._attr_extra_state_attributes['field'] = self.field
             self._attr_extra_state_attributes['measurement'] = self.measurement
-            
-            #if self.field == 'Energy.Consumption.Total.Day' or 'Energy.Storage.Total.Out.Day' or 'Energy.Storage.Total.In.Day' or 'Energy.Production.Total.Day' or 'Energy.External.Total.Out.Day' or 'Energy.External.Total.In.Day':
+
             if self._attr_native_unit_of_measurement == "kWh":
                 self._attr_extra_state_attributes['last_reset'] = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
                 self._attr_state_class = 'total'
