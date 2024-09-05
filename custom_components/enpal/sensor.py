@@ -18,9 +18,7 @@ from influxdb_client import InfluxDBClient
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=20)
 
-VERSION= '0.2.1'
-
-sc_wallbox_total_charge = 0.0
+VERSION= '0.2.2'
 
 def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='enpal')
@@ -176,25 +174,13 @@ class EnpalSensor(SensorEntity):
             # Sanity check for wallbox power - it should not be negative or greater than 30kW
             if self.field == 'Power.Wallbox.Connector.1.Charging':
                 if value < 0 or value > 30000:
-                    # write warning to log
-                    _LOGGER.warning(f'Wallbox power value out of range: {value}')
-                    return
+                    value = 0.0
 
-            # Sanity check for wallbox total charge - it should not be negative or much bigger than last valid reading
             if self.field == 'Energy.Wallbox.Connector.1.Charged.Total':
-                global sc_wallbox_total_charge
-                if sc_wallbox_total_charge > 0.0:         # Newly restarted HA will skip first check
-                    if value < 0:
-                        # write warning to log
-                        _LOGGER.warning(f'Wallbox total charge value is negative: {value}')
-                        return
-                    if value > 10000:           # skip check for new installations with low total charge
-                        if value > sc_wallbox_total_charge * 2.0:
-                                # write warning to log
-                                _LOGGER.warning(f'Wallbox total charge value of {value} is much bigger than last valid reading of {sc_wallbox_total_charge}')
-                                return
-
-                sc_wallbox_total_charge = value
+                # Sanity check - value can't be lower than 1.0.
+                # This is to prevent false readings that outputs 0 and restarts utility meters based on this sensor
+                if value < 1.0:
+                    return
 
             self._attr_native_value = round(float(value), 2)
             self._attr_device_class = self.enpal_device_class
