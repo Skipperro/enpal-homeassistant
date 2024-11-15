@@ -67,8 +67,6 @@ async def async_setup_entry(
             to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Power House Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
         if measurement == "system" and field == "Power.External.Total":
             to_add.append(EnpalSensor(field, measurement, 'mdi:home-lightning-bolt', 'Enpal Power External Total', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', 'W'))
-        if measurement == "inverter" and field == "Inverter.System.State":
-            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power', 'Enpal Inverter State', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'power', ''))
 
         # Consum Total per Day
         if measurement == "system" and field == "Energy.Consumption.Total.Day":
