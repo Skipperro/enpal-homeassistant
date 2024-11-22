@@ -25,7 +25,7 @@ def get_tables(ip: str, port: int, token: str):
     query_api = client.query_api()
 
     query = 'from(bucket: "solar") \
-      |> range(start: -5m) \
+      |> range(start: -24h) \
       |> last()'
 
     tables = query_api.query(query)
@@ -164,7 +164,7 @@ class EnpalSensor(SensorEntity):
             query_api = client.query_api()
 
             query = f'from(bucket: "solar") \
-              |> range(start: -5m) \
+              |> range(start: -15m) \
               |> filter(fn: (r) => r["_measurement"] == "{self.measurement}") \
               |> filter(fn: (r) => r["_field"] == "{self.field}") \
               |> last()'
