@@ -19,19 +19,22 @@ It is still a work in progress and is not guaranteed to work 100% or even work a
 
 - **Inverter measurements**:
   - Solar production.
-  - House energy consumption.
-  - 3 Phase Power.
+  - House consumption.
+  - 3 phase power and voltage.
   - Grid frequency.
   - Inverter temperature.
 - **Solar panels**:
   - Voltage for 2 strings.
   - Current for 2 strings.
-- **Battery estimation**:
-   - Due to lack of direct data in InfluxDB, the battery level is estimated by the calculated difference between energy production and consumption.
-   - Battery estimation is not 100% accurate, but it's close enough.
-   - Getting access to real battery level is not possible yet, but on the roadmap.
+  - Power for 2 strings.
+- **Battery**:
+   - Charge Percentage.
+   - Power flow (in and out).
+   - Energy transferred in a day
 - **WallBox**:
-  - ToDo
+  - Charging power.
+  - Total charging energy.
+  - Car charging state (not tested).
 
 ![enpal measurements](images/enpal-measurements.png)
 

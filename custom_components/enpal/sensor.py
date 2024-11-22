@@ -81,7 +81,15 @@ async def async_setup_entry(
         # Solar Energy.Production.Total.Day
         if measurement == "system" and field == "Energy.Production.Total.Day":
             to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power-variant', 'Enpal Production Day', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'energy', 'kWh'))
-            
+
+        # Grid frequency
+        if measurement == "inverter" and field == "Frequency.Grid":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power-variant', 'Enpal Grid Frequency', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'frequency', 'Hz'))
+
+        # Inverter Temperature
+        if measurement == "inverter" and field == "Temperature.Housing.Inside":
+            to_add.append(EnpalSensor(field, measurement, 'mdi:solar-power-variant', 'Enpal Inverter Temperature', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'temperature', '°C'))
+
         # Power phases
         if measurement == "inverter" and field == "Voltage.Phase.A":
             to_add.append(EnpalSensor(field, measurement, 'mdi:lightning-bolt', 'Enpal Voltage Phase A', config['enpal_host_ip'], config['enpal_host_port'], config['enpal_token'], 'voltage', 'V'))
@@ -186,6 +194,14 @@ class EnpalSensor(SensorEntity):
                 if value < 1.0:
                     return
 
+            if self.field == 'Frequency.Grid':
+                if value < 0 or value > 100:
+                    return
+
+            if self.field == 'Temperature.Housing.Inside':
+                if value < -100 or value > 100:
+                    return
+
             self._attr_native_value = round(float(value), 2)
             self._attr_device_class = self.enpal_device_class
             self._attr_native_unit_of_measurement	= self.unit
@@ -202,7 +218,7 @@ class EnpalSensor(SensorEntity):
                 self._attr_state_class = 'total'
 
             if self.field == 'Percent.Storage.Level':
-                if self._attr_native_value >= 10:
+                if self._attr_native_value < 10:
                     self._attr_icon = "mdi:battery-outline"
                 if self._attr_native_value <= 19 and self._attr_native_value >= 10:
                     self._attr_icon = "mdi:battery-10"
