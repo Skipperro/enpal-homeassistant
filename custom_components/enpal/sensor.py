@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from homeassistant.components.sensor import (SensorEntity)
 from homeassistant.core import HomeAssistant
 from homeassistant import config_entries
@@ -16,7 +16,7 @@ import logging
 from influxdb_client import InfluxDBClient
 
 _LOGGER = logging.getLogger(__name__)
-SCAN_INTERVAL = timedelta(seconds=20)
+SCAN_INTERVAL = timedelta(seconds=120)
 
 VERSION= '0.3.0'
 
@@ -175,6 +175,7 @@ class EnpalSensor(SensorEntity):
               |> range(start: -15m) \
               |> filter(fn: (r) => r["_measurement"] == "{self.measurement}") \
               |> filter(fn: (r) => r["_field"] == "{self.field}") \
+              |> aggregateWindow(every: 2m, fn: mean, createEmpty: true) \
               |> last()'
 
             tables = await self.hass.async_add_executor_job(query_api.query, query)
@@ -211,32 +212,32 @@ class EnpalSensor(SensorEntity):
             self._attr_extra_state_attributes['measurement'] = self.measurement
 
             if self._attr_native_unit_of_measurement == "kWh":
-                self._attr_extra_state_attributes['last_reset'] = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                self._attr_extra_state_attributes['last_reset'] = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                 self._attr_state_class = 'total'
             if self._attr_native_unit_of_measurement == "Wh":
-                self._attr_extra_state_attributes['last_reset'] = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                self._attr_extra_state_attributes['last_reset'] = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                 self._attr_state_class = 'total'
 
             if self.field == 'Percent.Storage.Level':
                 if self._attr_native_value < 10:
                     self._attr_icon = "mdi:battery-outline"
-                if self._attr_native_value <= 19 and self._attr_native_value >= 10:
+                if 19 >= self._attr_native_value >= 10:
                     self._attr_icon = "mdi:battery-10"
-                if self._attr_native_value <= 29 and self._attr_native_value >= 20:
+                if 29 >= self._attr_native_value >= 20:
                     self._attr_icon = "mdi:battery-20"
-                if self._attr_native_value <= 39 and self._attr_native_value >= 30:
+                if 39 >= self._attr_native_value >= 30:
                     self._attr_icon = "mdi:battery-30"
-                if self._attr_native_value <= 49 and self._attr_native_value >= 40:
+                if 49 >= self._attr_native_value >= 40:
                     self._attr_icon = "mdi:battery-40"
-                if self._attr_native_value <= 59 and self._attr_native_value >= 50:
+                if 59 >= self._attr_native_value >= 50:
                     self._attr_icon = "mdi:battery-50"    
-                if self._attr_native_value <= 69 and self._attr_native_value >= 60:
+                if 69 >= self._attr_native_value >= 60:
                     self._attr_icon = "mdi:battery-60"
-                if self._attr_native_value <= 79 and self._attr_native_value >= 70:
+                if 79 >= self._attr_native_value >= 70:
                     self._attr_icon = "mdi:battery-70"
-                if self._attr_native_value <= 89 and self._attr_native_value >= 80:
+                if 89 >= self._attr_native_value >= 80:
                     self._attr_icon = "mdi:battery-80"
-                if self._attr_native_value <= 99 and self._attr_native_value >= 90:
+                if 99 >= self._attr_native_value >= 90:
                     self._attr_icon = "mdi:battery-90"        
                 if self._attr_native_value == 100:
                     self._attr_icon = "mdi:battery"
