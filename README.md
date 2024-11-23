@@ -10,7 +10,7 @@
 ## Disclaimer
 
 This integration is created with acknowledgement and limited support from Enpal GmbH, but __it's not official software from Enpal__.<br>
-It's a custom integration created entirely by me (Skipperro), and thus Enapl GmbH is not responsible for any damage/issues caused by this integration, nor it offers any end-user support for it.
+It's a custom integration created entirely by me (Skipperro), and thus Enpal GmbH is not responsible for any damage/issues caused by this integration, nor it offers any end-user support for it.
 
 It is still a work in progress and is not guaranteed to work 100% or even work at all.<br>
 
