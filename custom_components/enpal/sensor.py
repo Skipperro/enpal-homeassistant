@@ -18,7 +18,7 @@ from influxdb_client import InfluxDBClient
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=120)
 
-VERSION= '0.3.0'
+VERSION= '0.3.1'
 
 def get_tables(ip: str, port: int, token: str):
     client = InfluxDBClient(url=f'http://{ip}:{port}', token=token, org='enpal')
